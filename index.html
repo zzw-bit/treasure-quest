@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寻宝奇缘 · 在线寻宝小游戏</title>
+<meta name="description" content="一个用 Promise 与 async/await 驱动的寻宝小游戏，配 Canvas 手绘动画。">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🗺️</text></svg>">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ================= 星空 / 雾效背景 ================= -->
+<canvas id="fx"></canvas>
+
+<div id="app">
+
+  <!-- ---------- 顶部标题栏 ---------- -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">🗺️</span>
+      <div>
+        <h1>寻宝奇缘</h1>
+        <p class="sub">JavaScript 异步编程 · Promise → async/await 动画演示</p>
+      </div>
+    </div>
+
+    <div class="hud">
+      <div class="hud-item">
+        <span class="hud-label">金币</span>
+        <span class="hud-value" id="hud-gold">100</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">体力</span>
+        <span class="hud-value" id="hud-stamina">3</span>
+      </div>
+      <div class="hud-item">
+        <span class="hud-label">用时</span>
+        <span class="hud-value" id="hud-time">0.0s</span>
+      </div>
+      <div class="hud-item hud-best">
+        <span class="hud-label">最佳金币</span>
+        <span class="hud-value" id="hud-best">—</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ---------- 主舞台：地图 + 探险家 ---------- -->
+  <main class="stage-wrap">
+    <div class="stage" id="stage">
+      <canvas id="scene"></canvas>
+
+      <!-- 成就解锁飘条 -->
+      <div class="toast-wrap" id="toast-wrap"></div>
+
+      <div class="stage-caption" id="caption">
+        <span class="cap-icon">🌌</span>
+        <span class="cap-text">古老的传说：七件宝物散落人间，唯有读懂古老文字的人才能寻得……</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- ---------- 下方面板 ---------- -->
+  <section class="panel">
+
+    <!-- 左：背包 + 图鉴 -->
+    <div class="card bag-card">
+      <div class="card-tabs">
+        <button class="card-tab active" data-pane="bag">🎒 背包 <small id="bag-count">0 / 9</small></button>
+        <button class="card-tab" data-pane="ach">🏅 成就 <small id="ach-count">0 / 10</small></button>
+        <button class="card-tab" data-pane="gallery">📖 图鉴 <small id="gal-count">0 / 3</small></button>
+      </div>
+
+      <!-- 背包 -->
+      <div class="card-pane" id="pane-bag">
+        <ul class="bag" id="bag">
+          <li class="bag-slot empty" data-key="clue"><span class="slot-icon">🧭</span><span class="slot-name">初始线索</span></li>
+          <li class="bag-slot empty" data-key="script"><span class="slot-icon">📜</span><span class="slot-name">古老文字</span></li>
+          <li class="bag-slot empty" data-key="scholar"><span class="slot-icon">🧙</span><span class="slot-name">学者口述</span></li>
+          <li class="bag-slot empty" data-key="key"><span class="slot-icon">🗝️</span><span class="slot-name">神庙钥匙</span></li>
+          <li class="bag-slot empty" data-key="backupKey"><span class="slot-icon">🔑</span><span class="slot-name">备用钥匙</span></li>
+          <li class="bag-slot empty" data-key="map"><span class="slot-icon">🗺️</span><span class="slot-name">星象图</span></li>
+          <li class="bag-slot empty" data-key="chest"><span class="slot-icon">🎁</span><span class="slot-name">神秘宝箱</span></li>
+          <li class="bag-slot empty" data-key="gem"><span class="slot-icon">💎</span><span class="slot-name">守护宝石</span></li>
+          <li class="bag-slot empty" data-key="crown"><span class="slot-icon">👑</span><span class="slot-name">传说宝藏</span></li>
+        </ul>
+        <p class="bag-tip">💡 点亮后的道具可以<b>点击使用</b>（消耗品）</p>
+      </div>
+
+      <!-- 成就 -->
+      <div class="card-pane hidden" id="pane-ach">
+        <ul class="ach-list" id="ach-list"></ul>
+      </div>
+
+      <!-- 图鉴 -->
+      <div class="card-pane hidden" id="pane-gallery">
+        <ul class="gal-list" id="gal-list"></ul>
+        <div class="record-box">
+          <div class="record-row"><span>🏆 最高金币</span><b id="rec-gold">—</b></div>
+          <div class="record-row"><span>⚡ 最快通关</span><b id="rec-time">—</b></div>
+          <div class="record-row"><span>👑 传说次数</span><b id="rec-legend">—</b></div>
+          <div class="record-row"><span>🎯 总游玩局数</span><b id="rec-plays">—</b></div>
+        </div>
+        <button class="btn btn-mini" id="btn-clear-record">清空记录</button>
+      </div>
+    </div>
+
+    <!-- 中：控制台 -->
+    <div class="card console-card">
+      <h2 class="card-title">🖥️ 异步任务日志 <small id="log-count">0 条</small></h2>
+      <div class="console" id="console"></div>
+    </div>
+
+    <!-- 右：控制按钮 -->
+    <div class="card ctrl-card">
+      <h2 class="card-title">🎮 操作</h2>
+
+      <button class="btn btn-primary" id="btn-start">
+        <span class="btn-icon">🚀</span> 开始寻宝
+      </button>
+      <button class="btn" id="btn-again" disabled>
+        <span class="btn-icon">🔁</span> 再来一次
+      </button>
+
+      <!-- 难度选择 -->
+      <div class="difficulty">
+        <span class="diff-label">难度</span>
+        <div class="diff-group" id="diff-group">
+          <button class="diff-btn" data-diff="easy">🌱 简单</button>
+          <button class="diff-btn active" data-diff="normal">⚔️ 普通</button>
+          <button class="diff-btn" data-diff="hard">💀 地狱</button>
+        </div>
+      </div>
+
+      <button class="btn btn-next hidden" id="btn-next">
+        <span class="btn-icon">▶️</span> 进入下一关
+      </button>
+
+      <button class="btn" id="btn-pause" disabled>
+        <span class="btn-icon">⏸️</span> 暂停寻宝
+      </button>
+
+      <label class="switch">
+        <input type="checkbox" id="chk-step">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-text">分关推进（<b>每站停下</b>，手动进入下一关）</span>
+      </label>
+
+      <div class="ctrl-row">
+        <button class="btn btn-half" id="btn-skip">
+          <span class="btn-icon">⏩</span> 倍速 ×1
+        </button>
+        <button class="btn btn-half" id="btn-sound">
+          <span class="btn-icon">🔊</span> 音效
+        </button>
+      </div>
+
+      <label class="switch">
+        <input type="checkbox" id="chk-mode">
+        <span class="switch-track"><span class="switch-thumb"></span></span>
+        <span class="switch-text">使用 <b>async / await</b> 模式</span>
+      </label>
+
+      <div class="keyhint">⌨️ 空格 = 暂停 / 继续（到站时 = 进入下一关）　·　方向键 / WASD 操控探险家</div>
+
+      <div class="code-peek">
+        <div class="code-tabbar">
+          <button class="code-tab active" data-tab="await">async/await</button>
+          <button class="code-tab" data-tab="promise">Promise 链式</button>
+          <button class="code-tab" data-tab="bus">事件总线</button>
+        </div>
+        <pre class="code" id="code-await"><code><span class="c-cm">/* 逻辑层：只管广播事件，不碰 DOM */</span>
+<span class="c-kw">async function</span> <span class="c-fn">findTreasure</span>() {
+  <span class="c-kw">const</span> clue = <span class="c-kw">await</span> TreasureMap.getInitialClue();
+  Bus.emit(EVT.ITEM_FOUND, clue);          <span class="c-cm">// 通知界面</span>
+
+  <span class="c-kw">let</span> script;
+  <span class="c-kw">try</span> {                                   <span class="c-cm">// 失败就降级</span>
+    script = <span class="c-kw">await</span> TreasureMap.decodeAncientScript(clue);
+  } <span class="c-kw">catch</span> (e) {
+    Bus.emit(EVT.LOG, { text: e.message });
+    script = <span class="c-kw">await</span> TreasureMap.askOldScholar(gold);
+  }
+
+  <span class="c-kw">for</span> (<span class="c-kw">let</span> i = <span class="c-num">1</span>; i &lt;= <span class="c-num">3</span>; i++) {             <span class="c-cm">// 重试 3 次</span>
+    <span class="c-kw">try</span> { key = <span class="c-kw">await</span> TreasureMap.findTempleKey(script); <span class="c-kw">break</span>; }
+    <span class="c-kw">catch</span> (e) { <span class="c-kw">if</span> (i === <span class="c-num">3</span>) key = <span class="c-kw">await</span> TreasureMap.staticBackupKey(); }
+  }
+  <span class="c-kw">return</span> <span class="c-kw">await</span> TreasureMap.openTreasureBox();
+}</code></pre>
+        <pre class="code hidden" id="code-promise"><code><span class="c-cm">/* Promise 链式：与自己手写的 async 版剧情一致 */</span>
+<span class="c-kw">function</span> <span class="c-fn">findTreasureWithPromises</span>() {
+  <span class="c-kw">return</span> TreasureMap.getInitialClue()
+    .then((c) => TreasureMap.decodeAncientScript(c))
+    .catch((e) => TreasureMap.askOldScholar(gold))   <span class="c-cm">// 降级</span>
+    .then((s) => retry(() => TreasureMap.findTempleKey(s), <span class="c-num">3</span>))
+    .then((k) => TreasureMap.readStarChart(k))
+    .then((m) => TreasureMap.searchTemple(m.text))
+    .then((f) => f.guard
+      ? TreasureMap.fightGuard(hero)                 <span class="c-cm">// 战斗分支</span>
+      : f)
+    .then(() => TreasureMap.openTreasureBox())
+    .catch((e) => Bus.emit(EVT.LOG, { text: e.message }));
+}</code></pre>
+        <pre class="code hidden" id="code-bus"><code><span class="c-cm">/* bus.js：发布-订阅，让逻辑层与渲染层解耦 */</span>
+<span class="c-kw">const</span> Bus = (<span class="c-kw">function</span> () {
+  <span class="c-kw">const</span> target = <span class="c-kw">new</span> EventTarget();       <span class="c-cm">// 借用原生事件系统</span>
+  <span class="c-kw">function</span> <span class="c-fn">on</span>(type, handler) {
+    <span class="c-kw">const</span> w = (e) => handler(e.detail);
+    target.addEventListener(type, w);
+    <span class="c-kw">return</span> () => target.removeEventListener(type, w);
+  }
+  <span class="c-kw">function</span> <span class="c-fn">emit</span>(type, detail) {
+    target.dispatchEvent(<span class="c-kw">new</span> CustomEvent(type, { detail }));
+  }
+  <span class="c-kw">return</span> { on, emit };
+})();
+
+<span class="c-cm">/* 逻辑层：只广播，不知道谁在听 */</span>
+Bus.emit(<span class="c-str">"item:found"</span>, clue);
+
+<span class="c-cm">/* 显示层：订阅自己关心的事件 */</span>
+Bus.on(<span class="c-str">"item:found"</span>, (item) => lightUpBagSlot(item));</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>寻宝奇缘</span>
+    <span class="dot">·</span>
+    <span>用 <code>setTimeout</code> + <code>Promise</code> + <code>async/await</code> + <code>事件总线</code> + <code>Canvas</code> 写成</span>
+  </footer>
+</div>
+
+<!-- ================= 结算弹窗 ================= -->
+<div class="modal-mask hidden" id="modal">
+  <div class="modal">
+    <div class="modal-glow"></div>
+    <div class="modal-icon" id="modal-icon">👑</div>
+    <h2 class="modal-title" id="modal-title">寻宝成功！</h2>
+    <p class="modal-desc" id="modal-desc"></p>
+    <ul class="modal-stats" id="modal-stats"></ul>
+    <div class="modal-ach" id="modal-ach"></div>
+    <button class="btn btn-primary" id="btn-modal-close">知道了</button>
+  </div>
+</div>
+
+<script src="bus.js"></script>
+<script src="audio.js"></script>
+<script src="treasure.js"></script>
+<script src="scene.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
